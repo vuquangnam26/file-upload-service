@@ -3,3 +3,18 @@ server:
 
 storage:
   path: "./uploads"
+
+minio:
+  endpoint: "localhost:9000"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+  use_ssl: false
+  bucket: "file-uploads"
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  group_id: "file-upload-service"
+  topics:
+    file_uploaded: "file.uploaded"
+    file_processed: "file.processed"

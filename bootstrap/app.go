@@ -16,6 +16,7 @@ func App() *Application {
 		Driver:   env.DBDriver,
 		Host:     env.DBHost,
 		Port:     env.DBPort,
+		User:     env.DBUser,
 		Password: env.DBPass,
 		DbName:   env.DBName,
 	}
