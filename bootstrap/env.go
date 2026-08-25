@@ -20,6 +20,16 @@ type Env struct {
 	RefreshTokenExpiryHour int    `mapstructure:"REFRESH_TOKEN_EXPIRY_HOUR"`
 	AccessTokenSecret      string `mapstructure:"ACCESS_TOKEN_SECRET"`
 	RefreshTokenSecret     string `mapstructure:"REFRESH_TOKEN_SECRET"`
+
+	// MinIO
+	MinioEndpoint string `mapstructure:"MINIO_ENDPOINT"`
+	MinioUser     string `mapstructure:"MINIO_ROOT_USER"`
+	MinioPassword string `mapstructure:"MINIO_ROOT_PASSWORD"`
+	MinioUseSSL   bool   `mapstructure:"MINIO_USE_SSL"`
+	MinioBucket   string `mapstructure:"MINIO_BUCKET"`
+
+	// Kafka
+	KafkaBrokers []string `mapstructure:"KAFKA_BROKERS"`
 }
 
 func NewEnv() *Env {
