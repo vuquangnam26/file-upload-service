@@ -1,8 +1,10 @@
 package bootstrap
 
 import (
+	"context"
 	"file-upload-service/bootstrap/database"
 	"log"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -35,7 +37,18 @@ func App() *Application {
 	if err != nil {
 		log.Fatalf("failed to initialize MinIO client: %v", err)
 	}
-
+	// Tự động kiểm tra và tạo bucket nếu chưa tồn tại
+	initCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	exists, err := minioClient.BucketExists(initCtx, env.MinioBucket)
+	if err == nil && !exists {
+		err = minioClient.MakeBucket(initCtx, env.MinioBucket, minio.MakeBucketOptions{})
+		if err != nil {
+			log.Printf("warning: failed to auto-create bucket %s: %v", env.MinioBucket, err)
+		} else {
+			log.Printf("MinIO bucket %q created successfully", env.MinioBucket)
+		}
+	}
 	// 2. Khởi tạo Kafka Client (franz-go)
 	kafkaClient, err := kgo.NewClient(
 		kgo.SeedBrokers(env.KafkaBrokers...),
