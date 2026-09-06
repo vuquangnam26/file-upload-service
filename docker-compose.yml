@@ -10,8 +10,8 @@ services:
       - "8080:8080"
     volumes:
       - .:/app
-    environment:
-      - CONFIG_PATH=/app/configs/config.yaml
+    env_file:
+      - .env
     depends_on:
       - database
       - minio

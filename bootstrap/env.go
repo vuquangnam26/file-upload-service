@@ -29,25 +29,41 @@ type Env struct {
 	MinioBucket   string `mapstructure:"MINIO_BUCKET"`
 
 	// Kafka
-	KafkaBrokers []string `mapstructure:"KAFKA_BROKERS"`
+	KafkaBrokers           []string `mapstructure:"KAFKA_BROKERS"`
+	KafkaGroupID           string   `mapstructure:"KAFKA_GROUP_ID"`
+	KafkaTopicFileUploaded string   `mapstructure:"KAFKA_TOPIC_FILE_UPLOADED"`
+	KafkaTopicProcessed    string   `mapstructure:"KAFKA_TOPIC_FILE_PROCESSED"`
 }
 
 func NewEnv() *Env {
 	env := Env{}
 	viper.SetConfigFile(".env")
 
-	err := viper.ReadInConfig()
-	if err != nil {
-		log.Fatal("Can not find .env file: ", err)
-	}
+	// 2. Cho phép tự động đọc biến môi trường hệ thống (Docker / K8s / OS env)
+	viper.AutomaticEnv()
+	// 3. Đặt giá trị mặc định phòng trường hợp thiếu biến
+	viper.SetDefault("APP_ENV", "development")
+	viper.SetDefault("SERVER_ADDRESS", ":8080")
+	viper.SetDefault("CONTEXT_TIMEOUT", 10)
+	viper.SetDefault("DB_DRIVER", "postgres")
+	viper.SetDefault("MINIO_BUCKET", "file-uploads")
+	viper.SetDefault("MINIO_USE_SSL", false)
+	viper.SetDefault("KAFKA_GROUP_ID", "file-upload-service")
+	viper.SetDefault("KAFKA_TOPIC_FILE_UPLOADED", "file.uploaded")
+	viper.SetDefault("KAFKA_TOPIC_FILE_PROCESSED", "file.processed")
 
-	err = viper.Unmarshal(&env)
-	if err != nil {
-		log.Fatal("Can not unmarshal .env file: ", err)
+	// 4. Đọc file .env nếu có (không crash nếu không có file, để deploy Docker/K8s)
+	if err := viper.ReadInConfig(); err != nil {
+		log.Printf("[INFO] No .env file found, using system environment variables: %v", err)
+	} else {
+		log.Printf("[INFO] Loaded configuration from .env file: %s", viper.ConfigFileUsed())
 	}
-
+	// 5. Unmarshal vào struct
+	if err := viper.Unmarshal(&env); err != nil {
+		log.Fatalf("Failed to unmarshal env configuration: %v", err)
+	}
 	if env.AppEnv == "development" {
-		log.Println("Running in development mode")
+		log.Println("[INFO] Application is running in DEVELOPMENT mode")
 	}
 	return &env
 

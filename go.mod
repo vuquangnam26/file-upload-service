@@ -2,10 +2,7 @@ module file-upload-service
 
 go 1.24.0
 
-require (
-	github.com/spf13/viper v1.21.0
-	gopkg.in/yaml.v3 v3.0.1
-)
+require github.com/spf13/viper v1.21.0
 
 require (
 	github.com/minio/minio-go/v7 v7.0.95
@@ -13,6 +10,7 @@ require (
 )
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/uptrace/bun v1.2.18
 	github.com/uptrace/bun/dialect/pgdialect v1.2.18
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
@@ -25,7 +23,6 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
