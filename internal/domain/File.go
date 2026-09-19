@@ -3,10 +3,10 @@ package domain
 import (
 	"time"
 
-	"github.com/google/uuid" // ← fix import
+	"github.com/google/uuid"
+	"github.com/uptrace/bun"
 )
 
-// FileStatus represents the processing state of an uploaded file.
 type FileStatus string
 
 const (
@@ -18,17 +18,19 @@ const (
 )
 
 type File struct {
-	ID           uuid.UUID
-	Name         string
-	OriginalName string
-	MimeType     string
-	Size         int64
-	Bucket       string
-	ObjectKey    string
-	Status       FileStatus
-	Checksum     string
-	UploadedBy   string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    *time.Time
+	bun.BaseModel `bun:"table:files,alias:f"` // ← Thêm dòng này để Bun biết tên bảng
+
+	ID           uuid.UUID  `bun:"id,pk,type:uuid"       json:"id"`
+	Name         string     `bun:"name,notnull"          json:"name"`
+	OriginalName string     `bun:"original_name,notnull" json:"original_name"`
+	MimeType     string     `bun:"mime_type,notnull"     json:"mime_type"`
+	Size         int64      `bun:"size,notnull"          json:"size"`
+	Bucket       string     `bun:"bucket,notnull"        json:"bucket"`
+	ObjectKey    string     `bun:"object_key,notnull"    json:"object_key"`
+	Status       FileStatus `bun:"status,notnull"        json:"status"`
+	Checksum     string     `bun:"checksum"              json:"checksum,omitempty"`
+	UploadedBy   string     `bun:"uploaded_by"           json:"uploaded_by,omitempty"`
+	CreatedAt    time.Time  `bun:"created_at,notnull"    json:"created_at"`
+	UpdatedAt    time.Time  `bun:"updated_at,notnull"    json:"updated_at"`
+	DeletedAt    *time.Time `bun:"deleted_at,soft_delete" json:"-"`
 }
