@@ -6,6 +6,7 @@ import (
 	"errors"
 	"file-upload-service/bootstrap"
 	"file-upload-service/internal/health"
+	"file-upload-service/internal/queue"
 	"file-upload-service/internal/repository"
 	"file-upload-service/internal/service"
 	"file-upload-service/internal/storage"
@@ -40,7 +41,14 @@ func main() {
 	mux := http.NewServeMux()
 	fileRepo := repository.NewPostgresFileRepository(bunDB)
 	fileStorage := storage.NewMinIOStorage(app.MinIO, app.Env.MinioBucket)
-	fileSvc := service.NewFileService(fileStorage, fileRepo, app.Env.MinioBucket)
+	kafkaProducer := queue.NewKafkaProducer(app.Kafka)
+	fileSvc := service.NewFileService(
+		fileStorage,
+		fileRepo,
+		app.Env.MinioBucket,
+		kafkaProducer,
+		app.Env.KafkaTopicFileUploaded,
+	)
 
 	// Đăng ký routes
 	fileHandler := handler.NewFileHandler(fileSvc)

@@ -6,10 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"file-upload-service/internal/domain"
+	"file-upload-service/internal/queue"
 	"file-upload-service/internal/repository"
 	"file-upload-service/internal/storage"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"strings"
@@ -46,9 +48,11 @@ type FileService interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.File, error)
 }
 type fileService struct {
-	storage storage.Storage
-	repo    repository.FileRepository
-	bucket  string
+	storage  storage.Storage
+	repo     repository.FileRepository
+	bucket   string
+	producer queue.EventProducer
+	topic    string
 }
 
 // GetByID implements [FileService].
@@ -118,6 +122,20 @@ func (s *fileService) Upload(ctx context.Context, input UploadInput) (*UploadRes
 		// TODO Sprint 5: Rollback — xóa file khỏi MinIO nếu lưu DB thất bại
 		return nil, fmt.Errorf("failed to save file metadata: %w", err)
 	}
+	// 9. Publish event "file.uploaded" lên Kafka
+	event := domain.FileUploadedEvent{
+		FileID:    file.ID,
+		Bucket:    file.Bucket,
+		ObjectKey: file.ObjectKey,
+		MimeType:  file.MimeType,
+		Size:      file.Size,
+		Checksum:  file.Checksum,
+		Timestamp: now,
+	}
+	if err := s.producer.Publish(ctx, s.topic, file.ID.String(), event); err != nil {
+		// Log warning nhưng KHÔNG return error — upload vẫn thành công
+		log.Printf("[FileService] WARNING: failed to publish file.uploaded event: %v", err)
+	}
 	return &UploadResult{File: file}, nil
 }
 
@@ -139,7 +157,18 @@ func getExtension(filename string) string {
 	return ""
 }
 
-func NewFileService(s storage.Storage, r repository.FileRepository, bucket string) FileService {
-	return &fileService{storage: s, repo: r, bucket: bucket}
-
+func NewFileService(
+	s storage.Storage,
+	r repository.FileRepository,
+	bucket string,
+	producer queue.EventProducer,
+	topic string,
+) FileService {
+	return &fileService{
+		storage:  s,
+		repo:     r,
+		bucket:   bucket,
+		producer: producer,
+		topic:    topic,
+	}
 }
