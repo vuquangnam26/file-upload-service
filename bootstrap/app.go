@@ -52,6 +52,7 @@ func App() *Application {
 	// 2. Khởi tạo Kafka Client (franz-go)
 	kafkaClient, err := kgo.NewClient(
 		kgo.SeedBrokers(env.KafkaBrokers...),
+		kgo.AllowAutoTopicCreation(),
 	)
 	if err != nil {
 		log.Fatalf("failed to initialize Kafka client: %v", err)

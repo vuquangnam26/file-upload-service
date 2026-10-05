@@ -49,6 +49,7 @@ func NewEnv() *Env {
 	viper.SetDefault("MINIO_BUCKET", "file-uploads")
 	viper.SetDefault("MINIO_USE_SSL", false)
 	viper.SetDefault("KAFKA_GROUP_ID", "file-upload-service")
+	viper.SetDefault("KAFKA_BROKERS", []string{"localhost:9092"})
 	viper.SetDefault("KAFKA_TOPIC_FILE_UPLOADED", "file.uploaded")
 	viper.SetDefault("KAFKA_TOPIC_FILE_PROCESSED", "file.processed")
 

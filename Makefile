@@ -8,11 +8,11 @@ MIGRATION_DIR=scripts/migrations
 # ─── App ──────────────────────────────────────────────────────────────────────
 .PHONY: run
 run:
-	go run cmd/api/main.go
+	go run cmd/main.go
 
 .PHONY: build
 build:
-	go build -o bin/api cmd/api/main.go
+	go build -o bin/api cmd/main.go
 
 # ─── Migration ────────────────────────────────────────────────────────────────
 .PHONY: migrate-up

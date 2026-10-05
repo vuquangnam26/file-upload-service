@@ -97,7 +97,7 @@ func (s *fileService) Upload(ctx context.Context, input UploadInput) (*UploadRes
 		ext,
 	)
 	// 6. Upload lên MinIO
-	if err := s.storage.Upload(ctx, objectKey, tee, input.Size, mimeType); err != nil {
+	if err := s.storage.Upload(ctx, objectKey, tee, -1, mimeType); err != nil {
 		return nil, fmt.Errorf("failed to upload to storage: %w", err)
 	}
 
