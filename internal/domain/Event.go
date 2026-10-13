@@ -1,6 +1,8 @@
 package domain
+
 import (
 	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -12,4 +14,11 @@ type FileUploadedEvent struct {
 	Size      int64     `json:"size"`
 	Checksum  string    `json:"checksum"`
 	Timestamp time.Time `json:"timestamp"`
+}
+
+type FileScannedEvent struct {
+	FileID    uuid.UUID  `json:"file_id"`
+	Status    FileStatus `json:"status"` // "clean" hoặc "infected"
+	VirusName string     `json:"virus_name,omitempty"`
+	Timestamp time.Time  `json:"timestamp"`
 }

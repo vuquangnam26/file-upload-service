@@ -8,9 +8,11 @@ import (
 	"file-upload-service/internal/health"
 	"file-upload-service/internal/queue"
 	"file-upload-service/internal/repository"
+	"file-upload-service/internal/scanner"
 	"file-upload-service/internal/service"
 	"file-upload-service/internal/storage"
 	handler "file-upload-service/internal/transport/http"
+	"file-upload-service/internal/worker"
 	"log"
 	"net/http"
 	"os"
@@ -49,7 +51,31 @@ func main() {
 		kafkaProducer,
 		app.Env.KafkaTopicFileUploaded,
 	)
-
+	// --- Khởi tạo ClamAV Scanner ---
+	clamavScanner := scanner.NewClamAVScanner(app.Env.ClamAVHost, app.Env.ClamAVPort, 30*time.Second)
+	// --- Khởi tạo VirusScanWorker ---
+	virusWorker := worker.NewVirusScanWorker(
+		fileStorage,
+		fileRepo,
+		clamavScanner,
+		kafkaProducer,
+		app.Env.KafkaTopicFileScanned,
+	)
+	// --- Khởi tạo Kafka Consumer cho Virus Scan ---
+	virusConsumer, err := queue.NewKafkaConsumer(
+		app.Env.KafkaBrokers,
+		app.Env.KafkaGroupVirusScan,
+		[]string{app.Env.KafkaTopicFileUploaded},
+		virusWorker.ProcessEvent,
+	)
+	if err != nil {
+		log.Fatalf("failed to create virus consumer: %v", err)
+	}
+	defer virusConsumer.Close()
+	// Chạy Consumer trong goroutine riêng biệt (Graceful shutdown khi server dừng)
+	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
+	defer cancelConsumer()
+	go virusConsumer.Start(consumerCtx)
 	// Đăng ký routes
 	fileHandler := handler.NewFileHandler(fileSvc)
 	fileHandler.RegisterRouters(mux)

@@ -61,6 +61,17 @@ services:
       retries: 5
 
   # ──────────────────────────────────────────────
+  # ClamAV (Antivirus Engine)
+  # ──────────────────────────────────────────────
+  clamav:
+    image: clamav/clamav:latest
+    ports:
+      - "3310:3310"
+    networks:
+      - app-network
+    restart: unless-stopped
+    
+  # ──────────────────────────────────────────────
   # Kafka (KRaft mode - no Zookeeper)
   # ──────────────────────────────────────────────
   kafka:

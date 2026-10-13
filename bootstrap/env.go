@@ -28,11 +28,19 @@ type Env struct {
 	MinioUseSSL   bool   `mapstructure:"MINIO_USE_SSL"`
 	MinioBucket   string `mapstructure:"MINIO_BUCKET"`
 
+	// ClamAV
+	ClamAVHost string `mapstructure:"CLAMAV_HOST"`
+	ClamAVPort string `mapstructure:"CLAMAV_PORT"`
+
 	// Kafka
 	KafkaBrokers           []string `mapstructure:"KAFKA_BROKERS"`
 	KafkaGroupID           string   `mapstructure:"KAFKA_GROUP_ID"`
 	KafkaTopicFileUploaded string   `mapstructure:"KAFKA_TOPIC_FILE_UPLOADED"`
 	KafkaTopicProcessed    string   `mapstructure:"KAFKA_TOPIC_FILE_PROCESSED"`
+
+	// Kafka Workers
+	KafkaGroupVirusScan   string `mapstructure:"KAFKA_GROUP_VIRUS_SCAN"`
+	KafkaTopicFileScanned string `mapstructure:"KAFKA_TOPIC_FILE_SCANNED"`
 }
 
 func NewEnv() *Env {
@@ -52,7 +60,10 @@ func NewEnv() *Env {
 	viper.SetDefault("KAFKA_BROKERS", []string{"localhost:9092"})
 	viper.SetDefault("KAFKA_TOPIC_FILE_UPLOADED", "file.uploaded")
 	viper.SetDefault("KAFKA_TOPIC_FILE_PROCESSED", "file.processed")
-
+	viper.SetDefault("CLAMAV_HOST", "localhost")
+	viper.SetDefault("CLAMAV_PORT", "3310")
+	viper.SetDefault("KAFKA_GROUP_VIRUS_SCAN", "virus-scan-worker")
+	viper.SetDefault("KAFKA_TOPIC_FILE_SCANNED", "file.scanned")
 	// 4. Đọc file .env nếu có (không crash nếu không có file, để deploy Docker/K8s)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("[INFO] No .env file found, using system environment variables: %v", err)
