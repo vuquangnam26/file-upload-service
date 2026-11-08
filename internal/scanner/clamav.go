@@ -35,7 +35,7 @@ func (c *clamavScanner) dial(ctx context.Context) (net.Conn, error) {
 	return conn, nil
 }
 
-// Ping kiểm tra ClamAV server có sống không (Health Check)
+// Ping checks if the ClamAV server is reachable (Health Check)
 func (c *clamavScanner) Ping(ctx context.Context) error {
 	conn, err := c.dial(ctx)
 	if err != nil {
@@ -56,18 +56,18 @@ func (c *clamavScanner) Ping(ctx context.Context) error {
 	return nil
 }
 
-// Scan truyền stream trực tiếp vào ClamAV bằng lệnh zINSTREAM
+// Scan streams data directly to ClamAV via zINSTREAM command
 func (c *clamavScanner) Scan(ctx context.Context, r io.Reader) (*ScanResult, error) {
 	conn, err := c.dial(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	// Gửi command zINSTREAM kèm null byte kết thúc
+	// Send zINSTREAM command terminated with a null byte
 	if _, err := conn.Write([]byte("zINSTREAM\x00")); err != nil {
 		return nil, fmt.Errorf("clamav.Scan: failed to initiate zINSTREAM: %w", err)
 	}
-	// Stream từng chunk 32KB vào ClamAV
+	// Stream chunks of 32KB to ClamAV
 	buf := make([]byte, 32*1024)
 	lenBuf := make([]byte, 4)
 	for {
@@ -78,7 +78,7 @@ func (c *clamavScanner) Scan(ctx context.Context, r io.Reader) (*ScanResult, err
 		}
 		n, readErr := r.Read(buf)
 		if n > 0 {
-			// Format của INSTREAM: [4 bytes chunk size (big-endian)] + [data]
+			// INSTREAM format: [4 bytes chunk size (big-endian)] + [data]
 			binary.BigEndian.PutUint32(lenBuf, uint32(n))
 			if _, err := conn.Write(lenBuf); err != nil {
 				return nil, fmt.Errorf("clamav.Scan: failed to write chunk size: %w", err)
@@ -94,13 +94,13 @@ func (c *clamavScanner) Scan(ctx context.Context, r io.Reader) (*ScanResult, err
 			return nil, fmt.Errorf("clamav.Scan: error reading stream: %w", readErr)
 		}
 	}
-	// Gửi chunk kích thước 0 để báo kết thúc stream
+	// Send 0-sized chunk to signal end of stream
 	if _, err := conn.Write([]byte{0, 0, 0, 0}); err != nil {
 		return nil, fmt.Errorf("clamav.Scan: failed to terminate stream: %w", err)
 	}
-	// Đọc kết quả từ ClamAV
-	// Phản hồi thường có dạng:
-	// "stream: OK\x00" hoặc "stream: Eicar-Signature FOUND\x00"
+	// Read response from ClamAV
+	// Responses typically format as:
+	// "stream: OK\x00" or "stream: Eicar-Signature FOUND\x00"
 	reader := bufio.NewReader(conn)
 	resp, err := reader.ReadString('\x00')
 	if err != nil && err != io.EOF {
@@ -111,7 +111,7 @@ func (c *clamavScanner) Scan(ctx context.Context, r io.Reader) (*ScanResult, err
 		return &ScanResult{IsClean: true}, nil
 	}
 	if strings.HasSuffix(resp, "FOUND") {
-		// Parse tên virus: "stream: <VirusName> FOUND"
+		// Parse virus name: "stream: <VirusName> FOUND"
 		parts := strings.Split(resp, ": ")
 		virusName := "Unknown"
 		if len(parts) >= 2 {

@@ -24,7 +24,7 @@ const (
 	MaxFileSize = 100 * 1024 * 1024 // 100 MB
 )
 
-// AllowedMIMETypes danh sách MIME type được phép upload
+// AllowedMIMETypes lists allowed upload MIME types
 var AllowedMIMETypes = map[string]bool{
 	"image/jpeg":      true,
 	"image/png":       true,
@@ -65,8 +65,8 @@ func (s *fileService) Upload(ctx context.Context, input UploadInput) (*UploadRes
 	if input.Size > MaxFileSize {
 		return nil, fmt.Errorf("file too large: max %d MB", MaxFileSize/1024/1024)
 	}
-	// 2. Đọc 512 byte đầu để detect MIME bằng Magic Bytes
-	//    (KHÔNG tin vào Content-Type header của client)
+	// 2. Read first 512 bytes to detect MIME via Magic Bytes
+	//    (Never trust client's Content-Type header)
 
 	buf := make([]byte, 512)
 	n, err := input.Reader.Read(buf)
@@ -74,19 +74,18 @@ func (s *fileService) Upload(ctx context.Context, input UploadInput) (*UploadRes
 		return nil, fmt.Errorf("failed to read file header: %w", err)
 	}
 	detectedMIME := http.DetectContentType(buf[:n])
-	// Strip params ví dụ "text/plain; charset=utf-8" → "text/plain"
+	// Strip parameters e.g. "text/plain; charset=utf-8" -> "text/plain"
 	mimeType, _, _ := mime.ParseMediaType(detectedMIME)
 	if !AllowedMIMETypes[mimeType] {
 		return nil, fmt.Errorf("file type not allowed: %s", mimeType)
 	}
-	// 3. Reconstruct reader: ghép 512 byte đã đọc + phần còn lại
-	//fullReader := io.MultiReader(strings.NewReader(string(buf[:n])), input.Reader)
+	// 3. Reconstruct reader: concatenate the 512 bytes read with the remaining stream
 	fullReader := io.MultiReader(bytes.NewReader(buf[:n]), input.Reader)
-	// 4. Tính Checksum SHA-256 song song với upload
-	//    Dùng TeeReader để đọc 1 lần nhưng ghi vào cả MinIO và hasher
+	// 4. Calculate SHA-256 Checksum in parallel with upload
+	//    Use TeeReader to read once while writing to both MinIO and hasher
 	hasher := sha256.New()
 	tee := io.TeeReader(fullReader, hasher)
-	// 5. Tạo Object Key theo pattern: uploads/{yyyy}/{mm}/{dd}/{uuid}_{filename}
+	// 5. Generate Object Key pattern: uploads/{yyyy}/{mm}/{dd}/{uuid}_{filename}
 	fileID := uuid.New()
 	now := time.Now()
 	ext := getExtension(input.Filename)
@@ -96,14 +95,14 @@ func (s *fileService) Upload(ctx context.Context, input UploadInput) (*UploadRes
 		sanitizeFilename(input.Filename),
 		ext,
 	)
-	// 6. Upload lên MinIO
+	// 6. Upload to MinIO
 	if err := s.storage.Upload(ctx, objectKey, tee, -1, mimeType); err != nil {
 		return nil, fmt.Errorf("failed to upload to storage: %w", err)
 	}
 
-	// 7. Tính checksum sau khi upload xong
+	// 7. Compute checksum after upload completes
 	checksum := hex.EncodeToString(hasher.Sum(nil))
-	// 8. Lưu metadata vào PostgreSQL
+	// 8. Save metadata to PostgreSQL
 	file := &domain.File{
 		ID:           fileID,
 		Name:         input.Filename,
@@ -119,10 +118,9 @@ func (s *fileService) Upload(ctx context.Context, input UploadInput) (*UploadRes
 		UpdatedAt:    now,
 	}
 	if err := s.repo.Create(ctx, file); err != nil {
-		// TODO Sprint 5: Rollback — xóa file khỏi MinIO nếu lưu DB thất bại
 		return nil, fmt.Errorf("failed to save file metadata: %w", err)
 	}
-	// 9. Publish event "file.uploaded" lên Kafka
+	// 9. Publish "file.uploaded" event to Kafka
 	event := domain.FileUploadedEvent{
 		FileID:    file.ID,
 		Bucket:    file.Bucket,
@@ -133,21 +131,20 @@ func (s *fileService) Upload(ctx context.Context, input UploadInput) (*UploadRes
 		Timestamp: now,
 	}
 	if err := s.producer.Publish(ctx, s.topic, file.ID.String(), event); err != nil {
-		// Log warning nhưng KHÔNG return error — upload vẫn thành công
+		// Log warning but do NOT return error: upload succeeded
 		log.Printf("[FileService] WARNING: failed to publish file.uploaded event: %v", err)
 	}
 	return &UploadResult{File: file}, nil
 }
 
-// sanitizeFilename loại bỏ ký tự nguy hiểm trong tên file
-
+// sanitizeFilename strips dangerous characters from filename
 func sanitizeFilename(name string) string {
-	base := strings.TrimSuffix(name, getExtension(name)) // ← Strip ext ra trước
+	base := strings.TrimSuffix(name, getExtension(name)) // Strip extension first
 	replacer := strings.NewReplacer(" ", "_", "/", "_", "\\", "_", "..", "_")
 	return replacer.Replace(base)
 }
 
-// getExtension trả về extension có dấu chấm: ".jpg", ".pdf"
+// getExtension returns file extension with dot: ".jpg", ".pdf"
 func getExtension(filename string) string {
 	for i := len(filename) - 1; i >= 0; i-- {
 		if filename[i] == '.' {

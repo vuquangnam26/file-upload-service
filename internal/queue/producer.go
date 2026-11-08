@@ -12,8 +12,8 @@ type EventProducer interface {
 	Close()
 }
 
-// kafkaProducer implement EventProducer bằng franz-go.
-// (Single Responsibility: chỉ lo việc đẩy message vào Kafka)
+// kafkaProducer implements EventProducer using franz-go.
+// (Single Responsibility: handles publishing messages to Kafka)
 type kafkaProducer struct {
 	client *kgo.Client
 }
@@ -32,7 +32,7 @@ func (p *kafkaProducer) Publish(ctx context.Context, topic string, key string, p
 		Key:   []byte(key),
 		Value: data,
 	}
-	// ProduceSync đợi Kafka ACK trước khi trả về — đảm bảo message không bị mất.
+	// ProduceSync waits for Kafka ACK before returning - guarantees no message loss.
 	results := p.client.ProduceSync(ctx, record)
 	if err := results.FirstErr(); err != nil {
 		return fmt.Errorf("queue.Publish: failed to produce to topic %s: %w", topic, err)

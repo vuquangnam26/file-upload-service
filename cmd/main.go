@@ -11,6 +11,7 @@ import (
 	"file-upload-service/internal/scanner"
 	"file-upload-service/internal/service"
 	"file-upload-service/internal/storage"
+	"file-upload-service/internal/thumbnail"
 	handler "file-upload-service/internal/transport/http"
 	"file-upload-service/internal/worker"
 	"log"
@@ -28,7 +29,7 @@ func main() {
 	defer app.Close()
 	bunDB := app.DB.GetDb().(*bun.DB)
 
-	// --- khởi tạo checkers ---
+	// --- Initialize health checkers ---
 	pgChecker := health.NewPostgreSQLHealthCheck(app.DB)
 	minioChecker := health.NewMinIOHealthCheck(app.MinIO, app.Env.MinioBucket)
 	kafkaChecker := health.NewKafkaHealthCheck(app.Kafka)
@@ -39,7 +40,7 @@ func main() {
 		kafkaChecker,
 	}
 
-	// --- /healthz handler ---
+	// --- Initialize Handlers & Services ---
 	mux := http.NewServeMux()
 	fileRepo := repository.NewPostgresFileRepository(bunDB)
 	fileStorage := storage.NewMinIOStorage(app.MinIO, app.Env.MinioBucket)
@@ -51,9 +52,9 @@ func main() {
 		kafkaProducer,
 		app.Env.KafkaTopicFileUploaded,
 	)
-	// --- Khởi tạo ClamAV Scanner ---
+	// --- Initialize ClamAV Scanner ---
 	clamavScanner := scanner.NewClamAVScanner(app.Env.ClamAVHost, app.Env.ClamAVPort, 30*time.Second)
-	// --- Khởi tạo VirusScanWorker ---
+	// --- Initialize VirusScanWorker ---
 	virusWorker := worker.NewVirusScanWorker(
 		fileStorage,
 		fileRepo,
@@ -61,7 +62,7 @@ func main() {
 		kafkaProducer,
 		app.Env.KafkaTopicFileScanned,
 	)
-	// --- Khởi tạo Kafka Consumer cho Virus Scan ---
+	// --- Initialize Kafka Consumer for Virus Scan ---
 	virusConsumer, err := queue.NewKafkaConsumer(
 		app.Env.KafkaBrokers,
 		app.Env.KafkaGroupVirusScan,
@@ -72,11 +73,29 @@ func main() {
 		log.Fatalf("failed to create virus consumer: %v", err)
 	}
 	defer virusConsumer.Close()
-	// Chạy Consumer trong goroutine riêng biệt (Graceful shutdown khi server dừng)
+	// Run consumers in background goroutine with graceful shutdown context
 	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
 	defer cancelConsumer()
 	go virusConsumer.Start(consumerCtx)
-	// Đăng ký routes
+
+	// --- Initialize Thumbnail Worker ---
+	thumbGenerator := thumbnail.NewImagingGenerator(300, 300)
+	thumbWorker := worker.NewThumbnailWorker(
+		fileStorage, fileRepo, thumbGenerator, kafkaProducer,
+		app.Env.KafkaTopicThumbnailDone,
+	)
+	thumbConsumer, err := queue.NewKafkaConsumer(
+		app.Env.KafkaBrokers,
+		app.Env.KafkaGroupThumbnail,
+		[]string{app.Env.KafkaTopicFileUploaded},
+		thumbWorker.ProcessEvent,
+	)
+	if err != nil {
+		log.Fatalf("failed to create thumbnail consumer: %v", err)
+	}
+	defer thumbConsumer.Close()
+	go thumbConsumer.Start(consumerCtx)
+	// Register routes
 	fileHandler := handler.NewFileHandler(fileSvc)
 	fileHandler.RegisterRouters(mux)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -90,22 +109,22 @@ func main() {
 		json.NewEncoder(w).Encode(report)
 	})
 
-	// 3. Khởi tạo HTTP Server
+	// 3. Initialize HTTP Server
 	server := &http.Server{
 		Addr:         app.Env.ServerAddress,
 		Handler:      mux,
-		ReadTimeout:  15 * time.Minute, // Cần timeout lớn để hỗ trợ upload file to
+		ReadTimeout:  15 * time.Minute, // High timeout to support large file uploads
 		WriteTimeout: 15 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
-	// 4. Chạy Server trong goroutine
+	// 4. Run Server in goroutine
 	go func() {
 		log.Printf("Starting file-upload-service on %s", app.Env.ServerAddress)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("server failed: %v", err)
 		}
 	}()
-	// 5. Graceful Shutdown (Bắt tín hiệu Ctrl+C / SIGTERM)
+	// 5. Graceful Shutdown (Listen for SIGINT / SIGTERM)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit

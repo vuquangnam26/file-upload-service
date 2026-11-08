@@ -28,7 +28,7 @@ func (p *postgresDB) Connect() error {
 	)
 	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
 
-	// Cấu hình connection pool
+	// Configure connection pool
 	sqldb.SetMaxOpenConns(25)
 	sqldb.SetMaxIdleConns(10)
 	sqldb.SetConnMaxLifetime(5 * time.Minute)
@@ -52,7 +52,7 @@ func (p *postgresDB) Ping() error {
 	if p.db == nil {
 		return fmt.Errorf("database not initialized")
 	}
-	// Thực sự ping DB với timeout
+	// Ping database with context timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return p.db.PingContext(ctx)

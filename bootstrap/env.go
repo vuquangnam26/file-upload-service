@@ -41,15 +41,21 @@ type Env struct {
 	// Kafka Workers
 	KafkaGroupVirusScan   string `mapstructure:"KAFKA_GROUP_VIRUS_SCAN"`
 	KafkaTopicFileScanned string `mapstructure:"KAFKA_TOPIC_FILE_SCANNED"`
+
+	// Kafka Thumbnail Worker
+	KafkaGroupThumbnail     string `mapstructure:"KAFKA_GROUP_THUMBNAIL"`
+	KafkaTopicThumbnailDone string `mapstructure:"KAFKA_TOPIC_THUMBNAIL_DONE"`
+	ThumbnailWidth          int    `mapstructure:"THUMBNAIL_WIDTH"`
+	ThumbnailHeight         int    `mapstructure:"THUMBNAIL_HEIGHT"`
 }
 
 func NewEnv() *Env {
 	env := Env{}
 	viper.SetConfigFile(".env")
 
-	// 2. Cho phép tự động đọc biến môi trường hệ thống (Docker / K8s / OS env)
+	// 2. Automatically read matching environment variables (Docker / K8s / OS env)
 	viper.AutomaticEnv()
-	// 3. Đặt giá trị mặc định phòng trường hợp thiếu biến
+	// 3. Set default values in case environment variables are missing
 	viper.SetDefault("APP_ENV", "development")
 	viper.SetDefault("SERVER_ADDRESS", ":8080")
 	viper.SetDefault("CONTEXT_TIMEOUT", 10)
@@ -64,13 +70,17 @@ func NewEnv() *Env {
 	viper.SetDefault("CLAMAV_PORT", "3310")
 	viper.SetDefault("KAFKA_GROUP_VIRUS_SCAN", "virus-scan-worker")
 	viper.SetDefault("KAFKA_TOPIC_FILE_SCANNED", "file.scanned")
-	// 4. Đọc file .env nếu có (không crash nếu không có file, để deploy Docker/K8s)
+	viper.SetDefault("KAFKA_GROUP_THUMBNAIL", "thumbnail-worker")
+	viper.SetDefault("KAFKA_TOPIC_THUMBNAIL_DONE", "file.thumbnail.done")
+	viper.SetDefault("THUMBNAIL_WIDTH", 300)
+	viper.SetDefault("THUMBNAIL_HEIGHT", 300)
+	// 4. Read .env file if available (does not crash if missing, supports Docker/K8s deployment)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("[INFO] No .env file found, using system environment variables: %v", err)
 	} else {
 		log.Printf("[INFO] Loaded configuration from .env file: %s", viper.ConfigFileUsed())
 	}
-	// 5. Unmarshal vào struct
+	// 5. Unmarshal into struct
 	if err := viper.Unmarshal(&env); err != nil {
 		log.Fatalf("Failed to unmarshal env configuration: %v", err)
 	}

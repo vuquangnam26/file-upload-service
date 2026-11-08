@@ -18,7 +18,12 @@ type FileUploadedEvent struct {
 
 type FileScannedEvent struct {
 	FileID    uuid.UUID  `json:"file_id"`
-	Status    FileStatus `json:"status"` // "clean" hoặc "infected"
+	Status    FileStatus `json:"status"` // "clean" or "infected"
 	VirusName string     `json:"virus_name,omitempty"`
 	Timestamp time.Time  `json:"timestamp"`
+}
+type FileThumbnailDoneEvent struct {
+    FileID       uuid.UUID `json:"file_id"`
+    ThumbnailKey string    `json:"thumbnail_key"`
+    Timestamp    time.Time `json:"timestamp"`
 }

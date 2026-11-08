@@ -62,3 +62,15 @@ func (r *postgresFileRepository) SoftDelete(ctx context.Context, id uuid.UUID) e
 	}
 	return nil
 }
+func (r *postgresFileRepository) UpdateThumbnailKey(ctx context.Context, id uuid.UUID, thumbnailKey string) error {
+	_, err := r.db.NewUpdate().
+		TableExpr("files").
+		Set("thumbnail_key = ?", thumbnailKey).
+		Set("updated_at = ?", time.Now()).
+		Where("id = ?", id).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("repository.UpdateThumbnailKey: %w", err)
+	}
+	return nil
+}

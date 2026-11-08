@@ -36,43 +36,43 @@ func NewVirusScanWorker(
 	}
 }
 
-// ProcessEvent là callback hàm MessageHandler cho Kafka Consumer
+// ProcessEvent is the MessageHandler callback for Kafka Consumer
 func (w *VirusScanWorker) ProcessEvent(ctx context.Context, topic string, key []byte, value []byte) error {
-	// 1. Unmarshal event từ Kafka
+	// 1. Unmarshal event from Kafka
 	event, err := queue.UnmarshalEvent[domain.FileUploadedEvent](value)
 	if err != nil {
 		return fmt.Errorf("unmarshal FileUploadedEvent: %w", err)
 	}
 	log.Printf("[VirusScanWorker] Start scanning fileID=%s key=%s", event.FileID, event.ObjectKey)
-	// 2. Cập nhật status -> scanning
+	// 2. Update status -> scanning
 	if err := w.repo.UpdateStatus(ctx, event.FileID, domain.FileStatusScanning); err != nil {
 		log.Printf("[VirusScanWorker] Failed to update status to scanning: %v", err)
 	}
-	// 3. Download stream từ MinIO
+	// 3. Download stream from MinIO
 	stream, err := w.storage.Download(ctx, event.ObjectKey)
 	if err != nil {
 		_ = w.repo.UpdateStatus(ctx, event.FileID, domain.FileStatusFailed)
 		return fmt.Errorf("failed to download from storage: %w", err)
 	}
 	defer stream.Close()
-	// 4. Scan qua ClamAV
+	// 4. Scan stream with ClamAV
 	result, err := w.scanner.Scan(ctx, stream)
 	if err != nil {
 		_ = w.repo.UpdateStatus(ctx, event.FileID, domain.FileStatusFailed)
 		return fmt.Errorf("failed to scan file: %w", err)
 	}
-	// 5. Cập nhật DB dựa trên kết quả
+	// 5. Update database based on scan result
 	finalStatus := domain.FileStatusClean
 	if !result.IsClean {
 		finalStatus = domain.FileStatusInfected
-		log.Printf("[VirusScanWorker] ⚠️ ALERT: Infected file detected! fileID=%s virus=%s", event.FileID, result.VirusName)
+		log.Printf("[VirusScanWorker] ALERT: Infected file detected! fileID=%s virus=%s", event.FileID, result.VirusName)
 	} else {
-		log.Printf("[VirusScanWorker] ✅ File is clean! fileID=%s", event.FileID)
+		log.Printf("[VirusScanWorker] File is clean! fileID=%s", event.FileID)
 	}
 	if err := w.repo.UpdateStatus(ctx, event.FileID, finalStatus); err != nil {
 		return fmt.Errorf("failed to update final status: %w", err)
 	}
-	// 6. Phát event file.scanned lên Kafka
+	// 6. Publish file.scanned event to Kafka
 	scannedEvent := domain.FileScannedEvent{
 		FileID:    event.FileID,
 		Status:    finalStatus,

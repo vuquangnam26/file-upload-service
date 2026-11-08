@@ -18,7 +18,7 @@ const (
 )
 
 type File struct {
-	bun.BaseModel `bun:"table:files,alias:f"` // ← Thêm dòng này để Bun biết tên bảng
+	bun.BaseModel `bun:"table:files,alias:f"` // Instructs Bun about table name and alias
 
 	ID           uuid.UUID  `bun:"id,pk,type:uuid"       json:"id"`
 	Name         string     `bun:"name,notnull"          json:"name"`
@@ -33,4 +33,5 @@ type File struct {
 	CreatedAt    time.Time  `bun:"created_at,notnull"    json:"created_at"`
 	UpdatedAt    time.Time  `bun:"updated_at,notnull"    json:"updated_at"`
 	DeletedAt    *time.Time `bun:"deleted_at,soft_delete" json:"-"`
+	ThumbnailKey string `bun:"thumbnail_key" json:"thumbnail_key,omitempty"`
 }

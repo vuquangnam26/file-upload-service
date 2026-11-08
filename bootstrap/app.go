@@ -29,7 +29,7 @@ func App() *Application {
 		DbName:   env.DBName,
 	}
 	db := database.GetInstance(dbCfg)
-	// 1. Khởi tạo MinIO Client
+	// 1. Initialize MinIO Client
 	minioClient, err := minio.New(env.MinioEndpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(env.MinioUser, env.MinioPassword, ""),
 		Secure: env.MinioUseSSL,
@@ -37,7 +37,7 @@ func App() *Application {
 	if err != nil {
 		log.Fatalf("failed to initialize MinIO client: %v", err)
 	}
-	// Tự động kiểm tra và tạo bucket nếu chưa tồn tại
+	// Automatically check and create bucket if it doesn't exist
 	initCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	exists, err := minioClient.BucketExists(initCtx, env.MinioBucket)
@@ -49,7 +49,7 @@ func App() *Application {
 			log.Printf("MinIO bucket %q created successfully", env.MinioBucket)
 		}
 	}
-	// 2. Khởi tạo Kafka Client (franz-go)
+	// 2. Initialize Kafka Client (franz-go)
 	kafkaClient, err := kgo.NewClient(
 		kgo.SeedBrokers(env.KafkaBrokers...),
 		kgo.AllowAutoTopicCreation(),

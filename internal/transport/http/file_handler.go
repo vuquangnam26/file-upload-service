@@ -16,7 +16,7 @@ func NewFileHandler(fs service.FileService) *FileHandler {
 	return &FileHandler{fileService: fs}
 }
 
-// RegisterRoutes đăng ký tất cả routes liên quan đến file
+// RegisterRouters registers all file related routes
 func (h *FileHandler) RegisterRouters(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/files/upload", h.Upload)
 	mux.HandleFunc("GET /api/v1/files/{id}", h.GetByID)
@@ -24,29 +24,29 @@ func (h *FileHandler) RegisterRouters(mux *http.ServeMux) {
 
 // Upload handles POST /api/v1/files/upload
 func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	// 1. Giới hạn body size trước khi parse (chặn từ tầng HTTP)
+	// 1. Limit body size before parsing (HTTP layer guard)
 	r.Body = http.MaxBytesReader(w, r.Body, 100*1024*1024) // 100MB
-	// 2. Parse multipart form (32MB lưu RAM, phần còn lại ra disk)
+	// 2. Parse multipart form (32MB in memory, rest to disk)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		respondError(w, http.StatusBadRequest, "failed to parse form: "+err.Error())
 		return
 	}
-	// 3. Lấy file từ form
+	// 3. Extract file from multipart form
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "field 'file' is required")
 		return
 	}
 	defer file.Close()
-	// 4. Gọi service xử lý
+	// 4. Delegate to FileService
 	result, err := h.fileService.Upload(r.Context(), service.UploadInput{
 		Reader:     file,
 		Filename:   header.Filename,
 		Size:       header.Size,
-		UploadedBy: r.Header.Get("X-User-ID"), // Từ auth middleware sau này
+		UploadedBy: r.Header.Get("X-User-ID"), // From future auth middleware
 	})
 	if err != nil {
-		// Phân biệt lỗi validation (400) vs lỗi server (500)
+		// Differentiate validation errors vs server errors
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -55,7 +55,7 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 // GetByID handles GET /api/v1/files/{id}
 func (h *FileHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	// Go 1.22+ hỗ trợ PathValue
+	// Go 1.22+ supports PathValue
 	idStr := r.PathValue("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {

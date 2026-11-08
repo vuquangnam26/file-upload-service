@@ -12,4 +12,5 @@ type FileRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.File, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.FileStatus) error
 	SoftDelete(ctx context.Context, id uuid.UUID) error
+	UpdateThumbnailKey(ctx context.Context, id uuid.UUID, thumbnailKey string) error
 }

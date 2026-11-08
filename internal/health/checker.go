@@ -21,7 +21,7 @@ type Report struct {
 	Checkes map[string]Result `json:"checks"`
 }
 
-// Checker — Strategy interface, mỗi service implement cái này
+// Checker - Strategy interface for individual health checks
 type Checker interface {
 	Name() string
 	Check(timeout time.Duration) Result
